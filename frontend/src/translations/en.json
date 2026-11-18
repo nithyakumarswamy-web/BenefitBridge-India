@@ -1,0 +1,96 @@
+{
+  "appName": "BenefitBridge India",
+  "appTagline": "Your AI-Powered Guide to Government Benefits",
+  "nav": {
+    "home": "Home",
+    "discover": "Find Schemes",
+    "chatbot": "AI Assistant",
+    "dashboard": "My Dashboard",
+    "admin": "Admin Portal",
+    "profile": "Profile"
+  },
+  "hero": {
+    "badge": "Official Hackathon Prototype • Pan-India Welfare Guide",
+    "title": "Discover Every Government Scheme You Are Entitled To",
+    "subtitle": "Multilingual AI assistant helping farmers, women, students, and citizens across all 28 states and 8 union territories unlock benefits with verified eligibility.",
+    "ctaFind": "Find Government Schemes",
+    "ctaChat": "Talk to AI Assistant",
+    "demoScenario": "Try Demo Scenario: Karnataka Farmer (ಕನ್ನಡ)"
+  },
+  "stats": {
+    "states": "28 States & 8 UTs",
+    "sources": "100% Verified Sources",
+    "schemes": "Central & State Welfare",
+    "languages": "7 Indian Languages"
+  },
+  "categories": {
+    "title": "Explore by Welfare Category",
+    "subtitle": "Discover schemes customized for your profession, family needs, and life stage.",
+    "agriculture": "Agriculture",
+    "education": "Education",
+    "healthcare": "Healthcare",
+    "housing": "Housing",
+    "women": "Women & Child",
+    "employment": "Employment",
+    "business": "Business & Loans",
+    "pension": "Pension & Senior",
+    "social": "Social Welfare"
+  },
+  "howItWorks": {
+    "title": "How BenefitBridge Works",
+    "subtitle": "A transparent 3-step pathway from confusion to verified benefits.",
+    "step1Title": "1. Share Citizen Profile",
+    "step1Desc": "Provide basic information like state, occupation, age, and income. No sensitive biometric or OTP data needed.",
+    "step2Title": "2. Deterministic AI Evaluation",
+    "step2Desc": "Our engine runs official eligibility rules across central and state criteria to give exact PASSED or UNKNOWN matches.",
+    "step3Title": "3. Action Plan & Apply",
+    "step3Desc": "Get personalized document checklists and direct verified links to official government application portals."
+  },
+  "chat": {
+    "title": "BenefitBridge AI Assistant",
+    "subtitle": "Ask questions in your preferred language about welfare schemes, benefits, and eligibility.",
+    "placeholder": "Ask a question (e.g., Which schemes can I apply for?)...",
+    "send": "Send",
+    "listening": "Listening... Speak now",
+    "clearChat": "Clear Conversation",
+    "suggested": "Suggested Questions",
+    "missingInfoAlert": "Missing Information to Confirm Eligibility:",
+    "recommendedSchemes": "Matching Government Schemes:",
+    "docsRequired": "Required Documents:",
+    "officialLink": "Official Portal",
+    "checkEligibility": "Check Criteria",
+    "generatePlan": "Create Action Plan"
+  },
+  "eligibility": {
+    "title": "Eligibility Criteria Breakdown",
+    "passed": "PASSED (Criteria Met)",
+    "failed": "FAILED (Criteria Not Met)",
+    "unknown": "UNKNOWN (Information Missing)",
+    "criterion": "Criterion",
+    "required": "Required",
+    "yourProfile": "Your Profile",
+    "disclaimer": "Informational evaluation only. Official determination is made solely by the respective government authority."
+  },
+  "documents": {
+    "title": "Personalized Document Checklist",
+    "subtitle": "Verify and prepare your documentation before applying on the official portal.",
+    "ready": "Ready",
+    "inProgress": "In Progress",
+    "notReady": "Not Ready",
+    "markReady": "Mark as Ready",
+    "demoUpload": "Safe Demo Upload",
+    "mandatory": "Mandatory",
+    "conditional": "Conditional"
+  },
+  "actionPlan": {
+    "title": "Personalized Application Action Plan",
+    "subtitle": "Follow these sequential steps to successfully submit your official application.",
+    "step": "Step",
+    "completed": "Completed",
+    "markDone": "Mark Completed"
+  },
+  "footer": {
+    "disclaimer": "Disclaimer: BenefitBridge India is a demonstration prototype. All official schemes, criteria, and benefits are verified against official government gazettes and portals. We never ask for Aadhaar OTPs, passwords, or bank PINs.",
+    "rights": "All rights reserved. Built for India."
+  }
+}
