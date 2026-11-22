@@ -68,12 +68,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigate, onOpenVoic
       {/* Hero Section */}
       <section className="relative overflow-hidden pt-8 pb-12 sm:pt-14 sm:pb-20">
         <div className="max-w-5xl mx-auto px-4 text-center space-y-6">
-          {/* Badge */}
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 border border-blue-200 text-blue-900 text-xs font-semibold shadow-xs">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-            <span>{t('hero.badge')}</span>
-          </div>
-
           {/* Heading */}
           <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold text-slate-900 tracking-tight leading-tight sm:leading-none">
             {t('hero.title')}

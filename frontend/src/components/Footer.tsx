@@ -80,11 +80,6 @@ export const Footer: React.FC = () => {
             <p className="text-xs text-slate-400 leading-relaxed">
               We never collect or store Aadhaar OTPs, bank passwords, or biometric secrets. BenefitBridge provides purely informational eligibility evaluation and directs citizens to official portals.
             </p>
-            <div className="pt-2">
-              <span className="inline-block px-2.5 py-1 rounded bg-slate-800 text-[11px] text-amber-300 font-mono">
-                Prototype v1.0 • Hackathon 2026
-              </span>
-            </div>
           </div>
         </div>
 

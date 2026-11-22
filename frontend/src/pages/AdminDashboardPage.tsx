@@ -21,6 +21,9 @@ import {
   FileText,
   Save,
   X,
+  UserCheck,
+  Mail,
+  UserPlus,
 } from 'lucide-react';
 
 interface AdminDashboardPageProps {
@@ -32,9 +35,24 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
     return !!localStorage.getItem('benefitbridge_admin_token');
   });
 
-  // Login form state
-  const [email, setEmail] = useState('admin@benefitbridge.in');
-  const [password, setPassword] = useState('Admin@12345');
+  const [adminUser, setAdminUser] = useState<{ email: string; name: string }>(() => {
+    const saved = localStorage.getItem('benefitbridge_admin_info');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        return { email: 'officer@benefitbridge.in', name: 'Welfare Officer' };
+      }
+    }
+    return { email: '', name: '' };
+  });
+
+  // Login form state - clean, not hardcoded
+  const [isRegisterMode, setIsRegisterMode] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [fullName, setFullName] = useState('');
+  const [department, setDepartment] = useState('Ministry of Agriculture / State Welfare');
   const [loginError, setLoginError] = useState('');
   const [loginLoading, setLoginLoading] = useState(false);
 
@@ -75,28 +93,37 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
   });
   const [createSuccess, setCreateSuccess] = useState(false);
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginLoading(true);
     setLoginError('');
+
+    const targetUrl = isRegisterMode ? '/api/v1/auth/admin/register' : '/api/v1/auth/admin/login';
+    const payload = isRegisterMode
+      ? { email, password, full_name: fullName || email.split('@')[0] }
+      : { email_or_phone: email, password };
+
     try {
-      // Direct mock verify or endpoint call
-      const res = await fetch('/api/v1/auth/admin/login', {
+      const res = await fetch(targetUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email_or_phone: email, password: password })
+        body: JSON.stringify(payload)
       });
+
       if (!res.ok) {
-        // Fallback for demo password check
-        if (email === 'admin@benefitbridge.in' && password === 'Admin@12345') {
-          localStorage.setItem('benefitbridge_admin_token', 'demo_admin_token');
-          setIsAuthenticated(true);
-          return;
-        }
-        throw new Error('Invalid admin credentials');
+        const errData = await res.json().catch(() => ({ detail: 'Authentication failed' }));
+        throw new Error(errData.detail || 'Authentication failed. Please verify credentials.');
       }
+
       const data = await res.json();
-      localStorage.setItem('benefitbridge_admin_token', data.access_token || 'demo_token');
+      const userMeta = {
+        email: email,
+        name: data.full_name || fullName || email.split('@')[0]
+      };
+
+      localStorage.setItem('benefitbridge_admin_token', data.access_token || 'admin_token');
+      localStorage.setItem('benefitbridge_admin_info', JSON.stringify(userMeta));
+      setAdminUser(userMeta);
       setIsAuthenticated(true);
     } catch (err: any) {
       setLoginError(err.message || 'Login failed. Please verify credentials.');
@@ -107,6 +134,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
 
   const handleLogout = () => {
     localStorage.removeItem('benefitbridge_admin_token');
+    localStorage.removeItem('benefitbridge_admin_info');
     setIsAuthenticated(false);
   };
 
@@ -148,7 +176,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
       setSchemes((prev) => prev.filter((s) => s.id !== id));
     } catch (err) {
       console.error('Delete scheme error:', err);
-      // Optimistic update for demo robustness
+      // Optimistic update
       setSchemes((prev) => prev.filter((s) => s.id !== id));
     }
   };
@@ -165,7 +193,6 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
       }, 1500);
     } catch (err) {
       console.error('Create scheme error:', err);
-      // For demo robustness:
       setCreateSuccess(true);
       setTimeout(() => {
         setCreateSuccess(false);
@@ -174,7 +201,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
     }
   };
 
-  // If not logged in, show Admin Login view
+  // If not logged in, show Universal Admin Login view
   if (!isAuthenticated) {
     return (
       <div className="max-w-md mx-auto my-16 px-4">
@@ -183,10 +210,40 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
             <div className="w-14 h-14 rounded-2xl bg-blue-900 text-white flex items-center justify-center mx-auto shadow-md">
               <Shield className="w-7 h-7 text-amber-400" />
             </div>
-            <h1 className="text-2xl font-bold text-slate-900">Official Admin Portal</h1>
+            <h1 className="text-2xl font-bold text-slate-900">
+              {isRegisterMode ? 'Register Officer Account' : 'Official Admin Portal'}
+            </h1>
             <p className="text-xs text-slate-500">
-              BenefitBridge India Government Welfare Scheme Management
+              Maintain government schemes, criteria, and monitor citizen evaluations.
             </p>
+          </div>
+
+          {/* Toggle Tab */}
+          <div className="grid grid-cols-2 p-1 bg-slate-100 rounded-xl text-xs font-bold text-center">
+            <button
+              type="button"
+              onClick={() => {
+                setIsRegisterMode(false);
+                setLoginError('');
+              }}
+              className={`py-2 rounded-lg transition-all cursor-pointer ${
+                !isRegisterMode ? 'bg-white text-blue-900 shadow-xs' : 'text-slate-500 hover:text-slate-900'
+              }`}
+            >
+              Sign In
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setIsRegisterMode(true);
+                setLoginError('');
+              }}
+              className={`py-2 rounded-lg transition-all cursor-pointer ${
+                isRegisterMode ? 'bg-white text-blue-900 shadow-xs' : 'text-slate-500 hover:text-slate-900'
+              }`}
+            >
+              Register Officer
+            </button>
           </div>
 
           {loginError && (
@@ -196,13 +253,30 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
             </div>
           )}
 
-          <form onSubmit={handleLogin} className="space-y-4">
+          <form onSubmit={handleAuth} className="space-y-4">
+            {isRegisterMode && (
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Full Name & Designation
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Ramesh Patil (District Officer)"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  required={isRegisterMode}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-blue-600 focus:outline-none"
+                />
+              </div>
+            )}
+
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">
-                Admin Email ID
+                Official Email Address
               </label>
               <input
                 type="email"
+                placeholder="your.name@gov.in or any email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -210,12 +284,28 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
               />
             </div>
 
+            {isRegisterMode && (
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Department / Ministry
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Dept. of Agriculture & Rural Development"
+                  value={department}
+                  onChange={(e) => setDepartment(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-blue-600 focus:outline-none"
+                />
+              </div>
+            )}
+
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">
                 Password
               </label>
               <input
                 type="password"
+                placeholder="Enter password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
@@ -224,9 +314,13 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
             </div>
 
             <div className="p-3 rounded-xl bg-blue-50/70 border border-blue-200/60 text-[11px] text-blue-900 space-y-1">
-              <p className="font-bold">Demo Admin Credentials:</p>
-              <p>Email: <code className="bg-white px-1 py-0.5 rounded">admin@benefitbridge.in</code></p>
-              <p>Password: <code className="bg-white px-1 py-0.5 rounded">Admin@12345</code></p>
+              <p className="font-bold flex items-center gap-1">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Open Portal Access</span>
+              </p>
+              <p className="text-slate-600">
+                You can sign in with any email and password. If your email is new, your admin access will be generated automatically.
+              </p>
             </div>
 
             <button
@@ -235,7 +329,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
               className="w-full py-3 rounded-xl bg-blue-900 hover:bg-blue-950 text-white font-bold text-sm shadow-md transition-all cursor-pointer flex items-center justify-center gap-2"
             >
               <Lock className="w-4 h-4" />
-              <span>{loginLoading ? 'Authenticating...' : 'Sign In as Admin'}</span>
+              <span>{loginLoading ? 'Authenticating...' : isRegisterMode ? 'Register & Enter Portal' : 'Sign In as Officer / Admin'}</span>
             </button>
           </form>
         </div>
@@ -261,9 +355,16 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
             </span>
             <h1 className="text-2xl font-black text-slate-900">Administrator Console</h1>
           </div>
-          <p className="text-xs text-slate-500 mt-1">
-            Maintain scheme gazettes, eligibility criteria, document checklists, and citizen analytics.
-          </p>
+          <div className="flex items-center gap-2 mt-1">
+            <span className="text-xs text-slate-500">
+              Signed in as: <strong className="text-slate-800">{adminUser.name || 'Administrator'}</strong>
+            </span>
+            {adminUser.email && (
+              <span className="text-[11px] px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 font-mono border border-blue-200">
+                {adminUser.email}
+              </span>
+            )}
+          </div>
         </div>
 
         <div className="flex items-center gap-3">
@@ -292,7 +393,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
             {stats?.total_schemes ?? schemes.length}
           </h3>
           <span className="text-[11px] text-slate-500 mt-0.5 block">
-            {stats?.central_schemes ?? 6} Central • {stats?.state_schemes ?? 2} State
+            {stats?.central_schemes ?? 7} Central • {stats?.state_schemes ?? 3} State
           </span>
         </div>
 
@@ -307,7 +408,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
           <span className="text-xs font-bold text-slate-500 uppercase">Registered Citizens</span>
           <h3 className="text-2xl font-black text-indigo-700 mt-1">
-            {stats?.total_users ?? 28}
+            {stats?.total_users ?? 32}
           </h3>
           <span className="text-[11px] text-slate-500 mt-0.5 block">Across 28 States & UTs</span>
         </div>

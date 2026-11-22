@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useLanguage } from '../context/LanguageContext';
 import { useUser } from '../context/UserContext';
 import { api } from '../services/api';
-import { speechService } from '../services/speech';
+import { speechService, SpeechState } from '../services/speech';
 import { ChatMessage, Scheme } from '../types';
 import { LanguageSelector } from '../components/LanguageSelector';
 import {
@@ -23,6 +23,10 @@ import {
   FileText,
   AlertCircle,
   RotateCcw,
+  Pause,
+  Play,
+  Square,
+  RefreshCw,
 } from 'lucide-react';
 
 interface ChatPageProps {
@@ -47,6 +51,13 @@ export const ChatPage: React.FC<ChatPageProps> = ({
   const [loading, setLoading] = useState(false);
   const [sessionUuid, setSessionUuid] = useState<string>('');
   const [speakingIdx, setSpeakingIdx] = useState<number | null>(null);
+  const [speechState, setSpeechState] = useState<SpeechState>({
+    isSpeaking: false,
+    isPaused: false,
+    currentChunk: 0,
+    totalChunks: 0,
+    isLoading: false,
+  });
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Suggested prompts per language
@@ -132,6 +143,10 @@ export const ChatPage: React.FC<ChatPageProps> = ({
     const query = (textToSend || input).trim();
     if (!query) return;
 
+    // Stop any ongoing speech when sending a new message
+    speechService.stopSpeaking();
+    setSpeakingIdx(null);
+
     setInput('');
     const userMsg: ChatMessage = {
       role: 'user',
@@ -152,11 +167,36 @@ export const ChatPage: React.FC<ChatPageProps> = ({
 
       setMessages((prev) => [...prev, response]);
 
-      // If user queried in voice, optionally speak back
-      if (textToSend) {
-        // Auto speak summary of first sentence
-        const firstSentence = response.content.split('\n')[0];
-        speechService.speakText(firstSentence, language as any);
+      // CRITICAL FIX: Send the FULL response text to TTS, NOT just split('\n')[0]
+      const fullResponseText = response.content;
+      const replyLang = (response.language || language) as any;
+
+      // Attempt backend Sarvam TTS synthesis with full text
+      try {
+        const synthRes = await api.synthesizeVoice({
+          text: fullResponseText,
+          language: replyLang,
+        });
+        const newIdx = messages.length + 1; // userMsg + response
+        setSpeakingIdx(newIdx);
+        speechService.speakText(
+          fullResponseText,
+          replyLang,
+          () => setSpeakingIdx(null),
+          synthRes.audio_url,
+          (state) => setSpeechState(state)
+        );
+      } catch (synthErr) {
+        // Fall back directly to client SpeechSynthesis with full text
+        const newIdx = messages.length + 1;
+        setSpeakingIdx(newIdx);
+        speechService.speakText(
+          fullResponseText,
+          replyLang,
+          () => setSpeakingIdx(null),
+          null,
+          (state) => setSpeechState(state)
+        );
       }
     } catch (err) {
       console.error('Chat send error:', err);
@@ -183,16 +223,54 @@ export const ChatPage: React.FC<ChatPageProps> = ({
     setSpeakingIdx(null);
   };
 
-  const handleToggleSpeak = (idx: number, text: string) => {
+  /**
+   * CRITICAL FIX: Speaks the FULL message text, not just split('\n')[0]
+   */
+  const handleToggleSpeak = async (idx: number, text: string, msgLang?: string) => {
     if (speakingIdx === idx) {
+      // If already speaking this message, stop it
       speechService.stopSpeaking();
       setSpeakingIdx(null);
-    } else {
-      setSpeakingIdx(idx);
-      speechService.speakText(text, language as any, () => {
-        setSpeakingIdx(null);
-      });
+      return;
     }
+
+    // Stop any previous speech first
+    speechService.stopSpeaking();
+    setSpeakingIdx(idx);
+
+    const targetLang = (msgLang || language) as any;
+    // Send the FULL text, cleaned of markdown by speechService internally
+    const fullMsgText = text;
+
+    try {
+      const synthRes = await api.synthesizeVoice({
+        text: fullMsgText,
+        language: targetLang,
+      });
+      speechService.speakText(
+        fullMsgText,
+        targetLang,
+        () => setSpeakingIdx(null),
+        synthRes.audio_url,
+        (state) => setSpeechState(state)
+      );
+    } catch {
+      speechService.speakText(
+        fullMsgText,
+        targetLang,
+        () => setSpeakingIdx(null),
+        null,
+        (state) => setSpeechState(state)
+      );
+    }
+  };
+
+  const handlePause = () => speechService.pauseSpeaking();
+  const handleResume = () => speechService.resumeSpeaking();
+  const handleReplay = () => speechService.replaySpeaking();
+  const handleStopSpeech = () => {
+    speechService.stopSpeaking();
+    setSpeakingIdx(null);
   };
 
   return (
@@ -235,6 +313,7 @@ export const ChatPage: React.FC<ChatPageProps> = ({
       <div className="flex-1 bg-white rounded-2xl border border-slate-200 p-4 sm:p-6 overflow-y-auto space-y-6 shadow-xs">
         {messages.map((msg, idx) => {
           const isUser = msg.role === 'user';
+          const isCurrentlySpeaking = speakingIdx === idx;
           return (
             <div
               key={idx}
@@ -253,29 +332,69 @@ export const ChatPage: React.FC<ChatPageProps> = ({
                     : 'bg-slate-50 border border-slate-200/80 text-slate-900 rounded-tl-xs'
                 }`}
               >
-                {/* Message Header with Text-To-Speech button for Assistant */}
+                {/* Message Header with TTS controls for Assistant */}
                 {!isUser && (
                   <div className="flex items-center justify-between border-b border-slate-200/60 pb-2 mb-2">
                     <span className="text-[10px] font-bold text-slate-400 tracking-wider uppercase">
                       BenefitBridge AI Guide
                     </span>
-                    <button
-                      onClick={() => handleToggleSpeak(idx, msg.content)}
-                      className="text-xs text-blue-700 hover:text-blue-900 font-semibold flex items-center gap-1 bg-blue-100/60 hover:bg-blue-200/60 px-2 py-0.5 rounded transition-all cursor-pointer"
-                      title="Listen aloud in native language"
-                    >
-                      {speakingIdx === idx ? (
+                    <div className="flex items-center gap-1">
+                      {isCurrentlySpeaking ? (
                         <>
-                          <VolumeX className="w-3.5 h-3.5 text-rose-600" />
-                          <span className="text-rose-600">Stop Voice</span>
+                          {/* Speaking indicator */}
+                          <span className="text-[10px] text-blue-600 font-medium mr-1 flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-pulse"></span>
+                            {speechState.isPaused ? 'Paused' : `Speaking ${speechState.currentChunk + 1}/${speechState.totalChunks || '...'}`}
+                          </span>
+
+                          {/* Pause / Resume */}
+                          {speechState.isPaused ? (
+                            <button
+                              onClick={handleResume}
+                              className="p-1 rounded text-blue-700 hover:bg-blue-100 transition-colors cursor-pointer"
+                              title="Resume"
+                            >
+                              <Play className="w-3.5 h-3.5" />
+                            </button>
+                          ) : (
+                            <button
+                              onClick={handlePause}
+                              className="p-1 rounded text-blue-700 hover:bg-blue-100 transition-colors cursor-pointer"
+                              title="Pause"
+                            >
+                              <Pause className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+
+                          {/* Replay */}
+                          <button
+                            onClick={handleReplay}
+                            className="p-1 rounded text-blue-700 hover:bg-blue-100 transition-colors cursor-pointer"
+                            title="Replay from start"
+                          >
+                            <RefreshCw className="w-3.5 h-3.5" />
+                          </button>
+
+                          {/* Stop */}
+                          <button
+                            onClick={handleStopSpeech}
+                            className="p-1 rounded text-rose-600 hover:bg-red-100 transition-colors cursor-pointer"
+                            title="Stop speaking"
+                          >
+                            <Square className="w-3.5 h-3.5" />
+                          </button>
                         </>
                       ) : (
-                        <>
+                        <button
+                          onClick={() => handleToggleSpeak(idx, msg.content, msg.language)}
+                          className="text-xs text-blue-700 hover:text-blue-900 font-semibold flex items-center gap-1 bg-blue-100/60 hover:bg-blue-200/60 px-2 py-0.5 rounded transition-all cursor-pointer"
+                          title="Listen to entire response"
+                        >
                           <Volume2 className="w-3.5 h-3.5" />
                           <span>Hear Response</span>
-                        </>
+                        </button>
                       )}
-                    </button>
+                    </div>
                   </div>
                 )}
 

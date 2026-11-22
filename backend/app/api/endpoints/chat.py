@@ -1,7 +1,9 @@
 import uuid
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from typing import Optional
 from app.core.database import get_db
+from app.core.security import get_current_user_optional
 from app.models.models import ChatSession, ChatMessage, CitizenProfile, User
 from app.schemas.schemas import ChatMessageCreate, ChatMessageOut, ChatSessionOut
 from app.services.rag_service import generate_grounded_response
@@ -11,18 +13,23 @@ router = APIRouter()
 @router.post("/message", response_model=ChatMessageOut)
 async def send_chat_message(
     payload: ChatMessageCreate,
-    user_id: int = 1,
+    current_user: Optional[User] = Depends(get_current_user_optional),
     db: Session = Depends(get_db)
 ):
-    # Retrieve or create session
+    target_user_id = current_user.id if current_user else 1
+
+    # Retrieve or create session, strictly isolated to the user
     session = None
     if payload.session_uuid:
-        session = db.query(ChatSession).filter(ChatSession.session_uuid == payload.session_uuid).first()
+        session = db.query(ChatSession).filter(
+            ChatSession.session_uuid == payload.session_uuid,
+            ChatSession.user_id == target_user_id
+        ).first()
     
     if not session:
         session = ChatSession(
-            user_id=user_id,
-            session_uuid=str(uuid.uuid4()),
+            user_id=target_user_id,
+            session_uuid=payload.session_uuid or str(uuid.uuid4()),
             title=payload.message[:30] + "...",
             language=payload.language or "en"
         )
@@ -39,7 +46,7 @@ async def send_chat_message(
     db.add(user_msg)
     db.flush()
 
-    profile = db.query(CitizenProfile).filter(CitizenProfile.user_id == user_id).first()
+    profile = db.query(CitizenProfile).filter(CitizenProfile.user_id == target_user_id).first()
 
     # Apply any explicit profile updates passed in payload
     if payload.profile_updates and profile:
@@ -85,10 +92,18 @@ async def send_chat_message(
     )
 
 @router.get("/history/{session_uuid}", response_model=ChatSessionOut)
-def get_chat_history(session_uuid: str, db: Session = Depends(get_db)):
-    session = db.query(ChatSession).filter(ChatSession.session_uuid == session_uuid).first()
+def get_chat_history(
+    session_uuid: str,
+    current_user: Optional[User] = Depends(get_current_user_optional),
+    db: Session = Depends(get_db)
+):
+    target_user_id = current_user.id if current_user else 1
+    session = db.query(ChatSession).filter(
+        ChatSession.session_uuid == session_uuid,
+        ChatSession.user_id == target_user_id
+    ).first()
     if not session:
-        raise HTTPException(status_code=404, detail="Chat session not found")
+        raise HTTPException(status_code=404, detail="Chat session not found or access denied")
 
     messages_out = []
     for m in session.messages:
@@ -113,8 +128,16 @@ def get_chat_history(session_uuid: str, db: Session = Depends(get_db)):
     )
 
 @router.delete("/history/{session_uuid}")
-def clear_chat_history(session_uuid: str, db: Session = Depends(get_db)):
-    session = db.query(ChatSession).filter(ChatSession.session_uuid == session_uuid).first()
+def clear_chat_history(
+    session_uuid: str,
+    current_user: Optional[User] = Depends(get_current_user_optional),
+    db: Session = Depends(get_db)
+):
+    target_user_id = current_user.id if current_user else 1
+    session = db.query(ChatSession).filter(
+        ChatSession.session_uuid == session_uuid,
+        ChatSession.user_id == target_user_id
+    ).first()
     if session:
         db.delete(session)
         db.commit()

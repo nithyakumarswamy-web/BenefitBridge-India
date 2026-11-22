@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from app.core.database import get_db
-from app.models.models import Scheme, SavedScheme, UserDocument, SchemeDocument, CitizenProfile
+from app.core.security import get_current_user_optional
+from app.models.models import Scheme, SavedScheme, UserDocument, SchemeDocument, CitizenProfile, User
 
 router = APIRouter()
 
@@ -17,12 +18,17 @@ STANDARD_DOCUMENTS = [
 ]
 
 @router.get("/checklist")
-def get_document_checklist(user_id: int = 1, db: Session = Depends(get_db)):
-    # Get user documents status
-    user_docs = {ud.document_name: ud for ud in db.query(UserDocument).filter(UserDocument.user_id == user_id).all()}
+def get_document_checklist(
+    current_user: Optional[User] = Depends(get_current_user_optional),
+    db: Session = Depends(get_db)
+):
+    target_user_id = current_user.id if current_user else 1
 
-    # Get documents required by user's saved schemes
-    saved_schemes = db.query(SavedScheme).filter(SavedScheme.user_id == user_id).all()
+    # Get strictly this user's documents
+    user_docs = {ud.document_name: ud for ud in db.query(UserDocument).filter(UserDocument.user_id == target_user_id).all()}
+
+    # Get documents required by this user's saved schemes
+    saved_schemes = db.query(SavedScheme).filter(SavedScheme.user_id == target_user_id).all()
     saved_scheme_ids = [s.scheme_id for s in saved_schemes]
     
     scheme_docs = db.query(SchemeDocument).filter(SchemeDocument.scheme_id.in_(saved_scheme_ids)).all() if saved_scheme_ids else []
@@ -76,14 +82,20 @@ def get_document_checklist(user_id: int = 1, db: Session = Depends(get_db)):
     }
 
 @router.post("/checklist/{doc_name}/status")
-def update_document_status(doc_name: str, status: str, user_id: int = 1, db: Session = Depends(get_db)):
+def update_document_status(
+    doc_name: str,
+    status: str,
+    current_user: Optional[User] = Depends(get_current_user_optional),
+    db: Session = Depends(get_db)
+):
+    target_user_id = current_user.id if current_user else 1
     doc = db.query(UserDocument).filter(
-        UserDocument.user_id == user_id,
+        UserDocument.user_id == target_user_id,
         UserDocument.document_name == doc_name
     ).first()
 
     if not doc:
-        doc = UserDocument(user_id=user_id, document_name=doc_name)
+        doc = UserDocument(user_id=target_user_id, document_name=doc_name)
         db.add(doc)
 
     doc.status = status.upper()
@@ -92,14 +104,19 @@ def update_document_status(doc_name: str, status: str, user_id: int = 1, db: Ses
     return {"status": doc.status, "document_name": doc.document_name}
 
 @router.post("/upload-demo")
-async def demo_upload(doc_name: str, user_id: int = 1, db: Session = Depends(get_db)):
+async def demo_upload(
+    doc_name: str,
+    current_user: Optional[User] = Depends(get_current_user_optional),
+    db: Session = Depends(get_db)
+):
+    target_user_id = current_user.id if current_user else 1
     doc = db.query(UserDocument).filter(
-        UserDocument.user_id == user_id,
+        UserDocument.user_id == target_user_id,
         UserDocument.document_name == doc_name
     ).first()
 
     if not doc:
-        doc = UserDocument(user_id=user_id, document_name=doc_name)
+        doc = UserDocument(user_id=target_user_id, document_name=doc_name)
         db.add(doc)
 
     doc.is_uploaded = True

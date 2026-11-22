@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 from app.core.database import get_db
+from app.core.security import get_current_user_optional
 from app.models.models import User, CitizenProfile, State, District
 from app.schemas.schemas import CitizenProfileOut, CitizenProfileUpdate, StateOut
 
@@ -17,24 +18,37 @@ def calculate_completion(profile: CitizenProfile) -> int:
     return int((filled / len(fields)) * 100)
 
 @router.get("/profile", response_model=CitizenProfileOut)
-def get_profile(user_id: int = 1, db: Session = Depends(get_db)):
-    profile = db.query(CitizenProfile).filter(CitizenProfile.user_id == user_id).first()
+def get_profile(
+    current_user: Optional[User] = Depends(get_current_user_optional),
+    db: Session = Depends(get_db)
+):
+    target_user_id = current_user.id if current_user else 1
+    profile = db.query(CitizenProfile).filter(CitizenProfile.user_id == target_user_id).first()
     if not profile:
-        profile = db.query(CitizenProfile).first()
-    if not profile:
-        raise HTTPException(status_code=404, detail="Profile not found")
+        profile = CitizenProfile(
+            user_id=target_user_id,
+            occupation="Citizen",
+            state="Karnataka",
+            residence_type="Rural"
+        )
+        db.add(profile)
+        db.commit()
+        db.refresh(profile)
         
     out = CitizenProfileOut.from_orm(profile)
     out.completion_percentage = calculate_completion(profile)
     return out
 
 @router.put("/profile", response_model=CitizenProfileOut)
-def update_profile(profile_data: CitizenProfileUpdate, user_id: int = 1, db: Session = Depends(get_db)):
-    profile = db.query(CitizenProfile).filter(CitizenProfile.user_id == user_id).first()
+def update_profile(
+    profile_data: CitizenProfileUpdate,
+    current_user: Optional[User] = Depends(get_current_user_optional),
+    db: Session = Depends(get_db)
+):
+    target_user_id = current_user.id if current_user else 1
+    profile = db.query(CitizenProfile).filter(CitizenProfile.user_id == target_user_id).first()
     if not profile:
-        profile = db.query(CitizenProfile).first()
-    if not profile:
-        profile = CitizenProfile(user_id=user_id)
+        profile = CitizenProfile(user_id=target_user_id)
         db.add(profile)
         db.flush()
 

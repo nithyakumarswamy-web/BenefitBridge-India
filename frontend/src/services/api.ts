@@ -4,14 +4,23 @@ const API_BASE = '/api/v1';
 
 async function request<T>(endpoint: string, options?: RequestInit): Promise<T> {
   const url = `${API_BASE}${endpoint}`;
+  const token = localStorage.getItem('benefitbridge_token');
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+    ...(options?.headers as Record<string, string> || {}),
+  };
+
   try {
     const res = await fetch(url, {
-      headers: {
-        'Content-Type': 'application/json',
-      },
       ...options,
+      headers,
     });
     if (!res.ok) {
+      if (res.status === 401 && token) {
+        // If unauthorized with token, token may have expired
+        console.warn('Authentication token expired or invalid');
+      }
       const errText = await res.text();
       throw new Error(`API Error ${res.status}: ${errText}`);
     }
@@ -23,6 +32,42 @@ async function request<T>(endpoint: string, options?: RequestInit): Promise<T> {
 }
 
 export const api = {
+  // Authentication
+  async getCurrentUser(): Promise<any> {
+    return request('/auth/me');
+  },
+
+  async loginWithGoogle(payload: {
+    credential?: string;
+    email?: string;
+    full_name?: string;
+    picture?: string;
+    google_id?: string;
+  }): Promise<any> {
+    return request('/auth/google', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async getGoogleConfig(): Promise<{ client_id: string; redirect_uri: string; is_configured: boolean }> {
+    return request('/auth/google/config');
+  },
+
+  async forgotPassword(email: string): Promise<any> {
+    return request('/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    });
+  },
+
+  async resetPassword(data: { email: string; new_password: string; reset_token?: string }): Promise<any> {
+    return request('/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
   // Citizen Profile
   async getProfile(): Promise<CitizenProfile> {
     return request<CitizenProfile>('/citizens/profile');
@@ -112,6 +157,16 @@ export const api = {
     mock_text?: string;
   }): Promise<{ recognized_text: string; language: string; provider: string }> {
     return request('/voice/transcribe', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async synthesizeVoice(payload: {
+    text: string;
+    language: string;
+  }): Promise<{ text: string; language: string; audio_url?: string | null; status: string }> {
+    return request('/voice/synthesize', {
       method: 'POST',
       body: JSON.stringify(payload),
     });

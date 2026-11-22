@@ -1,4 +1,23 @@
 import os
+from pathlib import Path
+
+# Load .env file safely without external dependencies
+_backend_dir = Path(__file__).resolve().parent.parent.parent
+_env_path = _backend_dir / ".env"
+if _env_path.exists():
+    try:
+        with open(_env_path, "r", encoding="utf-8") as _f:
+            for _line in _f:
+                _line = _line.strip()
+                if not _line or _line.startswith("#") or "=" not in _line:
+                    continue
+                _key, _val = _line.split("=", 1)
+                _key = _key.strip()
+                _val = _val.strip().strip("'\"")
+                if _key and _key not in os.environ:
+                    os.environ[_key] = _val
+    except Exception:
+        pass
 
 class Settings:
     PROJECT_NAME: str = "BenefitBridge India"
@@ -12,11 +31,20 @@ class Settings:
     DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./benefitbridge.db")
     
     # External APIs (Optional - fallbacks provided)
-    GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
-    BHASHINI_API_KEY: str = os.getenv("BHASHINI_API_KEY", "")
-    BHASHINI_USER_ID: str = os.getenv("BHASHINI_USER_ID", "")
+    GEMINI_API_KEY: str = ""
+    BHASHINI_API_KEY: str = ""
+    BHASHINI_USER_ID: str = ""
+    SARVAM_API_KEY: str = os.getenv("SARVAM_API_KEY", "")
+    SARVAM_CHAT_MODEL: str = os.getenv("SARVAM_CHAT_MODEL", "sarvam-105b-conversations")
+    SARVAM_TTS_MODEL: str = os.getenv("SARVAM_TTS_MODEL", "bulbul:v3")
+    SARVAM_ASR_MODEL: str = os.getenv("SARVAM_ASR_MODEL", "saaras:v3")
+
+    # Google OAuth 2.0 Credentials
+    GOOGLE_CLIENT_ID: str = os.getenv("GOOGLE_CLIENT_ID", "")
+    GOOGLE_CLIENT_SECRET: str = os.getenv("GOOGLE_CLIENT_SECRET", "")
+    GOOGLE_REDIRECT_URI: str = os.getenv("GOOGLE_REDIRECT_URI", "http://localhost:5173/auth/callback")
     
-    # Supported Languages
+    # Supported Languages (8 languages including Bengali)
     SUPPORTED_LANGUAGES = {
         "en": "English",
         "kn": "ಕನ್ನಡ (Kannada)",
@@ -24,7 +52,8 @@ class Settings:
         "ta": "தமிழ் (Tamil)",
         "te": "తెలుగు (Telugu)",
         "ml": "മലയാളം (Malayalam)",
-        "mr": "मराठी (Marathi)"
+        "mr": "मराठी (Marathi)",
+        "bn": "বাংলা (Bengali)"
     }
     
     # Categories

@@ -25,6 +25,7 @@ export const VoiceMicModal: React.FC<VoiceMicModalProps> = ({ onClose, onSubmitP
     te: 'నాకు ఏ ప్రభుత్వ పథకాలు అందుబాటులో ఉన్నాయి?',
     ml: 'എനിക്ക് ലഭ്യമായ സർക്കാർ പദ്ധതികൾ ഏതൊക്കെയാണ്?',
     mr: 'माझ्यासाठी कोणत्या सरकारी योजना उपलब्ध आहेत?',
+    bn: 'আমার জন্য কোন কোন সরকারি প্রকল্প উপলব্ধ আছে?',
   };
 
   const samplePrompt = DEMO_SAMPLES[language] || DEMO_SAMPLES['en'];

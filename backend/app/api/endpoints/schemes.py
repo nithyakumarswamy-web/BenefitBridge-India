@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from app.core.database import get_db
+from app.core.security import get_current_user_optional
 from app.models.models import Scheme, CitizenProfile, SavedScheme, User
 from app.schemas.schemas import SchemeOut, SchemeDetailOut
 from app.services.eligibility_engine import evaluate_scheme_eligibility
@@ -157,21 +158,31 @@ def get_scheme_detail(
     return detail
 
 @router.post("/{scheme_id}/save")
-def save_scheme(scheme_id: int, user_id: int = 1, db: Session = Depends(get_db)):
+def save_scheme(
+    scheme_id: int,
+    current_user: Optional[User] = Depends(get_current_user_optional),
+    db: Session = Depends(get_db)
+):
+    target_user_id = current_user.id if current_user else 1
     existing = db.query(SavedScheme).filter(
-        SavedScheme.user_id == user_id,
+        SavedScheme.user_id == target_user_id,
         SavedScheme.scheme_id == scheme_id
     ).first()
     if not existing:
-        saved = SavedScheme(user_id=user_id, scheme_id=scheme_id)
+        saved = SavedScheme(user_id=target_user_id, scheme_id=scheme_id)
         db.add(saved)
         db.commit()
     return {"status": "saved", "scheme_id": scheme_id}
 
 @router.delete("/{scheme_id}/save")
-def unsave_scheme(scheme_id: int, user_id: int = 1, db: Session = Depends(get_db)):
+def unsave_scheme(
+    scheme_id: int,
+    current_user: Optional[User] = Depends(get_current_user_optional),
+    db: Session = Depends(get_db)
+):
+    target_user_id = current_user.id if current_user else 1
     saved = db.query(SavedScheme).filter(
-        SavedScheme.user_id == user_id,
+        SavedScheme.user_id == target_user_id,
         SavedScheme.scheme_id == scheme_id
     ).first()
     if saved:
@@ -180,12 +191,16 @@ def unsave_scheme(scheme_id: int, user_id: int = 1, db: Session = Depends(get_db
     return {"status": "unsaved", "scheme_id": scheme_id}
 
 @router.get("/user/saved", response_model=List[SchemeOut])
-def get_user_saved_schemes(user_id: int = 1, db: Session = Depends(get_db)):
-    saved_records = db.query(SavedScheme).filter(SavedScheme.user_id == user_id).all()
+def get_user_saved_schemes(
+    current_user: Optional[User] = Depends(get_current_user_optional),
+    db: Session = Depends(get_db)
+):
+    target_user_id = current_user.id if current_user else 1
+    saved_records = db.query(SavedScheme).filter(SavedScheme.user_id == target_user_id).all()
     scheme_ids = [s.scheme_id for s in saved_records]
     schemes = db.query(Scheme).filter(Scheme.id.in_(scheme_ids)).all()
     
-    profile = db.query(CitizenProfile).filter(CitizenProfile.user_id == user_id).first()
+    profile = db.query(CitizenProfile).filter(CitizenProfile.user_id == target_user_id).first()
     results = []
     for s in schemes:
         elig_status = None

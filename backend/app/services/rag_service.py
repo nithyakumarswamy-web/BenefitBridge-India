@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.models.models import Scheme, CitizenProfile, User, ChatSession, ChatMessage
 from app.services.eligibility_engine import evaluate_scheme_eligibility
 from app.services.translations import get_text
+from app.services.sarvam_service import sarvam_ai, detect_language_from_text
 from app.core.config import settings
 
 # Keywords for Intent & Entity Extraction
@@ -154,25 +155,22 @@ def retrieve_schemes_for_query(db: Session, text: str, profile: Optional[Citizen
         
     return results
 
-async def call_gemini_api_if_configured(prompt: str, system_instruction: str) -> Optional[str]:
-    api_key = settings.GEMINI_API_KEY
-    if not api_key:
+async def call_sarvam_ai_if_configured(prompt: str, system_instruction: str, user_language: str) -> Optional[str]:
+    """
+    Primary AI provider: Sarvam AI conversational model (sarvam-105b-conversations).
+    Answers with full grounding, scheme facts, and native language understanding.
+    """
+    if not sarvam_ai.is_configured:
         return None
+        
+    messages = [
+        {"role": "system", "content": system_instruction},
+        {"role": "user", "content": prompt}
+    ]
     
-    try:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
-        payload = {
-            "contents": [{"parts": [{"text": prompt}]}],
-            "systemInstruction": {"parts": [{"text": system_instruction}]},
-            "generationConfig": {"temperature": 0.2, "maxOutputTokens": 800}
-        }
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            resp = await client.post(url, json=payload)
-            if resp.status_code == 200:
-                data = resp.json()
-                return data["candidates"][0]["content"]["parts"][0]["text"]
-    except Exception as e:
-        print(f"Gemini API call failed: {e}")
+    reply, err = await sarvam_ai.chat_completion(messages=messages)
+    if reply:
+        return reply.strip()
     return None
 
 async def generate_grounded_response(
@@ -250,13 +248,14 @@ async def generate_grounded_response(
     status_order = {"PASSED": 0, "UNKNOWN": 1, "FAILED": 2}
     recommendations.sort(key=lambda x: status_order.get(x["eligibility_status"], 3))
 
-    # 4. Multilingual response synthesis
-    lang = language.lower() if language else "en"
+    # 4. Multilingual response synthesis with automatic language detection
+    detected = detect_language_from_text(user_message, default=language or "en")
+    lang = detected.lower() if detected else "en"
     
-    # Check if Gemini API is available
-    system_prompt = f"""You are BenefitBridge India, an AI assistant for government benefits.
-The user is speaking in language '{lang}'.
-Answer factually based strictly on these verified scheme details:
+    # Primary AI provider: Sarvam AI (sarvam-105b-conversations)
+    system_prompt = f"""You are BenefitBridge India, an AI assistant for government benefits and welfare schemes.
+The user is communicating in '{settings.SUPPORTED_LANGUAGES.get(lang, 'English')}'.
+Answer accurately, politely, and factually based strictly on these verified scheme details:
 {json.dumps([{
     'name': r['name'],
     'status': r['eligibility_status'],
@@ -265,11 +264,15 @@ Answer factually based strictly on these verified scheme details:
     'url': r['official_apply_url']
 } for r in recommendations[:4]], ensure_ascii=False)}
 
-Never hallucinate. Clearly explain eligibility and required documents. Respond in {settings.SUPPORTED_LANGUAGES.get(lang, 'English')}."""
+Rules:
+1. Never invent or hallucinate schemes, benefits, or links.
+2. Clearly explain eligibility and required documents.
+3. Respond naturally in {settings.SUPPORTED_LANGUAGES.get(lang, 'English')}.
+4. Provide the official portal link for the schemes."""
 
-    gemini_reply = await call_gemini_api_if_configured(user_message, system_prompt)
+    sarvam_reply = await call_sarvam_ai_if_configured(user_message, system_prompt, lang)
 
-    if not gemini_reply:
+    if not sarvam_reply:
         # High quality grounded deterministic response builder in the chosen language!
         if lang == "kn":
             if profile and profile.occupation == "Farmer":
@@ -382,6 +385,22 @@ Never hallucinate. Clearly explain eligibility and required documents. Respond i
                 )
             content = intro + "\n\n" + "\n\n".join(scheme_bullets)
 
+        elif lang == "bn":
+            intro = "নমস্কার! আপনার প্রোফাইল অনুসারে আপনার জন্য উপলব্ধ প্রধান সরকারি কল্যাণ প্রকল্পসমূহ:"
+            scheme_bullets = []
+            for r in recommendations[:3]:
+                st_label = "✅ আপনি যোগ্য" if r["eligibility_status"] == "PASSED" else (
+                    "⚠️ অতিরিক্ত তথ্যের প্রয়োজন" if r["eligibility_status"] == "UNKNOWN" else "❌ যোগ্য নন"
+                )
+                scheme_bullets.append(
+                    f"• **{r['name']}**\n"
+                    f"  - যোগ্যতার স্থিতি: {st_label}\n"
+                    f"  - সুবিধা: {r['benefits']}\n"
+                    f"  - প্রয়োজনীয় নথি: {', '.join(r['documents'][:3])}\n"
+                    f"  - অফিসিয়াল পোর্টাল: {r['official_apply_url']}"
+                )
+            content = intro + "\n\n" + "\n\n".join(scheme_bullets)
+
         else: # Default English
             intro = "Hello! Based on your citizen profile, here are the official government welfare schemes tailored for you:"
             scheme_bullets = []
@@ -401,7 +420,7 @@ Never hallucinate. Clearly explain eligibility and required documents. Respond i
                 missing_text = f"\n\n🔍 **Missing Information to Confirm Full Eligibility:** {', '.join([f.replace('_', ' ') for f in all_missing_fields])}."
             content = intro + "\n\n" + "\n\n".join(scheme_bullets) + missing_text
     else:
-        content = gemini_reply
+        content = sarvam_reply
 
     # Suggested follow-up chips
     suggested_questions = []
@@ -418,6 +437,13 @@ Never hallucinate. Clearly explain eligibility and required documents. Respond i
             "आवश्यक दस्तावेजों की चेकलिस्ट क्या है?",
             "पीएम-किसान के लिए ऑनलाइन आवेदन कैसे करें?",
             "आयुष्मान भारत कार्ड कैसे बनवाएं?"
+        ]
+    elif lang == "bn":
+        suggested_questions = [
+            "আমার জন্য কর্মপরিকল্পনা (Action Plan) তৈরি করুন",
+            "প্রয়োজনীয় নথির চেকলিস্ট দেখান",
+            "পিএম-কিসানের জন্য কীভাবে আবেদন করব?",
+            "আয়ুষ্মান ভারত কার্ড কীভাবে তৈরি করবেন?"
         ]
     else:
         suggested_questions = [

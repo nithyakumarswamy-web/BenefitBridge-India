@@ -7,9 +7,10 @@ import ta from '../translations/ta.json';
 import te from '../translations/te.json';
 import ml from '../translations/ml.json';
 import mr from '../translations/mr.json';
+import bn from '../translations/bn.json';
 
 const translations: Record<SupportedLanguage, any> = {
-  en, kn, hi, ta, te, ml, mr
+  en, kn, hi, ta, te, ml, mr, bn
 };
 
 export interface LanguageOption {
@@ -26,6 +27,7 @@ export const SUPPORTED_LANGUAGES: LanguageOption[] = [
   { code: 'te', name: 'Telugu', nativeName: 'తెలుగు' },
   { code: 'ml', name: 'Malayalam', nativeName: 'മലയാളം' },
   { code: 'mr', name: 'Marathi', nativeName: 'मराठी' },
+  { code: 'bn', name: 'Bengali', nativeName: 'বাংলা' },
 ];
 
 interface LanguageContextType {

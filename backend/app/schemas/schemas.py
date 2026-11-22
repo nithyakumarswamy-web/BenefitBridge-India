@@ -10,6 +10,14 @@ class UserCreate(BaseModel):
     password: Optional[str] = "Demo@12345"
     preferred_language: Optional[str] = "en"
 
+class ForgotPasswordRequest(BaseModel):
+    email: str
+
+class ResetPasswordRequest(BaseModel):
+    email: str
+    new_password: str
+    reset_token: Optional[str] = None
+
 class UserLogin(BaseModel):
     email_or_phone: str
     password: str
@@ -19,15 +27,29 @@ class Token(BaseModel):
     token_type: str = "bearer"
     user_id: int
     full_name: Optional[str] = None
+    email: Optional[str] = None
+    profile_picture: Optional[str] = None
+    auth_provider: Optional[str] = "local"
     role: Optional[str] = "CITIZEN"
+    created_at: Optional[datetime] = None
+
+class GoogleAuthRequest(BaseModel):
+    credential: Optional[str] = None
+    email: Optional[str] = None
+    full_name: Optional[str] = None
+    google_id: Optional[str] = None
+    picture: Optional[str] = None
 
 class UserOut(BaseModel):
     id: int
     full_name: Optional[str] = None
     email: Optional[str] = None
     phone_number: Optional[str] = None
+    profile_picture: Optional[str] = None
+    auth_provider: Optional[str] = "local"
     preferred_language: str
     is_active: bool
+    created_at: Optional[datetime] = None
     
     class Config:
         from_attributes = True

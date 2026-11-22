@@ -14,6 +14,7 @@ import { EligibilityModal } from './components/EligibilityModal';
 import { ActionPlanModal } from './components/ActionPlanModal';
 import { DocumentChecklistModal } from './components/DocumentChecklistModal';
 import { VoiceMicModal } from './components/VoiceMicModal';
+import { AuthModal } from './components/AuthModal';
 import { EligibilityEvaluation } from './types';
 import { api } from './services/api';
 
@@ -33,6 +34,7 @@ function App() {
   const [showDocuments, setShowDocuments] = useState(false);
   const [showVoice, setShowVoice] = useState(false);
   const [eligLoading, setEligLoading] = useState(false);
+  const [showAuth, setShowAuth] = useState(false);
 
   // --- Navigators ---
   const handleNavigate = useCallback((page: string, params?: any) => {
@@ -153,7 +155,7 @@ function App() {
       <UserProvider>
         <div className="min-h-screen flex flex-col bg-slate-50">
           {/* Navbar */}
-          <Navbar activePage={activePage} onNavigate={handleNavigate} />
+          <Navbar activePage={activePage} onNavigate={handleNavigate} onOpenAuth={() => setShowAuth(true)} />
 
           {/* Page Content */}
           <main className="flex-1">
@@ -164,6 +166,9 @@ function App() {
           {activePage !== 'chat' && <Footer />}
 
           {/* ===== MODALS ===== */}
+
+          {/* Auth Modal */}
+          <AuthModal isOpen={showAuth} onClose={() => setShowAuth(false)} />
 
           {/* Eligibility Modal */}
           {showEligibility && (

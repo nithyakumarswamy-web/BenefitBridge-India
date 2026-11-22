@@ -2,16 +2,17 @@ import React, { useState } from 'react';
 import { useLanguage } from '../context/LanguageContext';
 import { useUser } from '../context/UserContext';
 import { LanguageSelector } from './LanguageSelector';
-import { Shield, Sparkles, User, Search, MessageSquare, LayoutDashboard, Menu, X, Landmark } from 'lucide-react';
+import { Shield, Sparkles, User, Search, MessageSquare, LayoutDashboard, Menu, X, Landmark, LogIn, LogOut } from 'lucide-react';
 
 interface NavbarProps {
   activePage: string;
   onNavigate: (page: string) => void;
+  onOpenAuth?: () => void;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ activePage, onNavigate }) => {
+export const Navbar: React.FC<NavbarProps> = ({ activePage, onNavigate, onOpenAuth }) => {
   const { t } = useLanguage();
-  const { profile } = useUser();
+  const { profile, currentUser, logout } = useUser();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const navItems = [
@@ -78,7 +79,7 @@ export const Navbar: React.FC<NavbarProps> = ({ activePage, onNavigate }) => {
             })}
           </nav>
 
-          {/* Right Controls: Language & Citizen Badge */}
+          {/* Right Controls: Language, Citizen Badge & Auth */}
           <div className="hidden md:flex items-center gap-3">
             <LanguageSelector />
 
@@ -86,18 +87,49 @@ export const Navbar: React.FC<NavbarProps> = ({ activePage, onNavigate }) => {
               onClick={() => onNavigate('profile')}
               className="flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-full border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-medium transition-all shadow-xs cursor-pointer"
             >
-              <div className="w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xs">
-                {profile?.state ? profile.state.charAt(0) : 'C'}
-              </div>
+              {currentUser?.profile_picture ? (
+                <img
+                  src={currentUser.profile_picture}
+                  alt={currentUser.full_name || 'User'}
+                  className="w-6 h-6 rounded-full object-cover border border-blue-300"
+                />
+              ) : (
+                <div className="w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xs">
+                  {profile?.state ? profile.state.charAt(0) : 'C'}
+                </div>
+              )}
               <div className="text-left">
-                <span className="block font-semibold text-slate-800 leading-tight">
-                  {profile?.occupation || 'Citizen'}
-                </span>
+                <div className="flex items-center gap-1">
+                  <span className="block font-semibold text-slate-800 leading-tight">
+                    {currentUser?.full_name || profile?.occupation || 'Citizen'}
+                  </span>
+                  {currentUser?.auth_provider === 'google' && (
+                    <span className="inline-block w-2 h-2 rounded-full bg-emerald-500" title="Google Account Verified" />
+                  )}
+                </div>
                 <span className="block text-[10px] text-slate-500 leading-none">
-                  {profile?.state || 'Set Profile'} ({profile?.completion_percentage || 0}%)
+                  {currentUser?.email || profile?.state || 'Set Profile'} ({profile?.completion_percentage || 0}%)
                 </span>
               </div>
             </button>
+
+            {currentUser ? (
+              <button
+                onClick={logout}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-50 text-red-700 hover:bg-red-100 border border-red-200 text-xs font-semibold transition-all"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                Sign Out
+              </button>
+            ) : (
+              <button
+                onClick={onOpenAuth}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 text-white hover:bg-blue-700 text-xs font-semibold transition-all shadow-sm"
+              >
+                <LogIn className="w-3.5 h-3.5" />
+                Sign In
+              </button>
+            )}
           </div>
 
           {/* Mobile menu button */}
@@ -145,12 +177,30 @@ export const Navbar: React.FC<NavbarProps> = ({ activePage, onNavigate }) => {
             >
               <div className="flex items-center gap-2">
                 <User className="w-4 h-4 text-blue-700" />
-                <span>{profile?.occupation || 'Citizen'} ({profile?.state || 'Profile'})</span>
+                <span>{currentUser?.full_name || profile?.occupation || 'Citizen'} ({profile?.state || 'Profile'})</span>
               </div>
               <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full font-bold">
                 {profile?.completion_percentage || 0}% Complete
               </span>
             </button>
+
+            {currentUser ? (
+              <button
+                onClick={() => { logout(); setMobileMenuOpen(false); }}
+                className="w-full flex items-center gap-2 mt-1 px-3 py-2.5 rounded-lg bg-red-50 text-red-700 hover:bg-red-100 font-medium text-sm"
+              >
+                <LogOut className="w-4 h-4" />
+                Sign Out
+              </button>
+            ) : (
+              <button
+                onClick={() => { onOpenAuth?.(); setMobileMenuOpen(false); }}
+                className="w-full flex items-center gap-2 mt-1 px-3 py-2.5 rounded-lg bg-blue-600 text-white hover:bg-blue-700 font-medium text-sm"
+              >
+                <LogIn className="w-4 h-4" />
+                Sign In
+              </button>
+            )}
           </div>
         </div>
       )}

@@ -1,4 +1,4 @@
-export type SupportedLanguage = 'en' | 'kn' | 'hi' | 'ta' | 'te' | 'ml' | 'mr';
+export type SupportedLanguage = 'en' | 'kn' | 'hi' | 'ta' | 'te' | 'ml' | 'mr' | 'bn';
 
 export interface CitizenProfile {
   id?: number;
@@ -131,6 +131,7 @@ export interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
   content: string;
   language: string;
+  audio_url?: string | null;
   recommended_schemes?: any[];
   eligibility_breakdowns?: any[];
   missing_fields?: string[];

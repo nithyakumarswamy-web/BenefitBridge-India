@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 from app.core.database import get_db
+from app.core.security import get_current_user_optional
 from app.models.models import ActionPlan, ActionPlanStep, Scheme, User
 from app.schemas.schemas import ActionPlanOut
 
@@ -47,8 +48,12 @@ STANDARD_STEPS = [
 ]
 
 @router.get("", response_model=List[ActionPlanOut])
-def get_user_action_plans(user_id: int = 1, db: Session = Depends(get_db)):
-    plans = db.query(ActionPlan).filter(ActionPlan.user_id == user_id).all()
+def get_user_action_plans(
+    current_user: Optional[User] = Depends(get_current_user_optional),
+    db: Session = Depends(get_db)
+):
+    target_user_id = current_user.id if current_user else 1
+    plans = db.query(ActionPlan).filter(ActionPlan.user_id == target_user_id).all()
     results = []
     for p in plans:
         results.append(ActionPlanOut(
@@ -62,19 +67,24 @@ def get_user_action_plans(user_id: int = 1, db: Session = Depends(get_db)):
     return results
 
 @router.post("/generate/{scheme_id}", response_model=ActionPlanOut)
-def generate_action_plan(scheme_id: int, user_id: int = 1, db: Session = Depends(get_db)):
+def generate_action_plan(
+    scheme_id: int,
+    current_user: Optional[User] = Depends(get_current_user_optional),
+    db: Session = Depends(get_db)
+):
+    target_user_id = current_user.id if current_user else 1
     scheme = db.query(Scheme).filter(Scheme.id == scheme_id).first()
     if not scheme:
         raise HTTPException(status_code=404, detail="Scheme not found")
 
     existing = db.query(ActionPlan).filter(
-        ActionPlan.user_id == user_id,
+        ActionPlan.user_id == target_user_id,
         ActionPlan.scheme_id == scheme_id
     ).first()
 
     if not existing:
         existing = ActionPlan(
-            user_id=user_id,
+            user_id=target_user_id,
             scheme_id=scheme_id,
             status="IN_PROGRESS",
             progress_percentage=16
@@ -107,10 +117,19 @@ def generate_action_plan(scheme_id: int, user_id: int = 1, db: Session = Depends
     )
 
 @router.put("/steps/{step_id}")
-def update_step_status(step_id: int, is_completed: bool, db: Session = Depends(get_db)):
+def update_step_status(
+    step_id: int,
+    is_completed: bool,
+    current_user: Optional[User] = Depends(get_current_user_optional),
+    db: Session = Depends(get_db)
+):
     step = db.query(ActionPlanStep).filter(ActionPlanStep.id == step_id).first()
     if not step:
         raise HTTPException(status_code=404, detail="Step not found")
+
+    # Authorize step modification: must belong to active user if authenticated
+    if current_user and step.plan and step.plan.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Access denied to this action plan step")
 
     step.is_completed = is_completed
     plan = step.plan
@@ -133,5 +152,5 @@ def update_step_status(step_id: int, is_completed: bool, db: Session = Depends(g
         "step_id": step.id,
         "is_completed": step.is_completed,
         "plan_progress": plan.progress_percentage,
-        "plan_status": plan.status
+        "status": plan.status
     }
