@@ -105,19 +105,6 @@ npm.cmd run dev
 
 ---
 
-## 🔑 Demo Credentials
-
-### 1. Administrator Portal
-- **URL:** Click **"Admin Portal"** in the navigation bar
-- **Email:** `admin@benefitbridge.in`
-- **Password:** `Admin@12345`
-- **Privileges:** Manage schemes, create new welfare programs, inspect evaluations, review citizen feedback.
-
-### 2. Citizen Demo Account
-- **Email:** `demo.farmer@karnataka.in`
-- **Password:** `Demo@12345`
-
----
 
 ## 🛡️ Privacy & Compliance Disclaimer
 
